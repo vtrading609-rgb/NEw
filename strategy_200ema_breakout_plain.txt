@@ -1,0 +1,43 @@
+//@version=6
+strategy("5m 200 EMA Breakout", overlay=true, initial_capital=100000, default_qty_type=strategy.percent_of_equity, default_qty_value=1)
+
+// Inputs
+signalTf     = input.timeframe("5", "Signal Timeframe")
+emaLength    = input.int(200, "EMA Length", minval=1)
+allowShorts  = input.bool(true, "Allow Short Entries")
+useStopLoss  = input.bool(false, "Use Stop Loss")
+stopLossPerc = input.float(1.0, "Stop Loss %", step=0.1, minval=0.1)
+useTakeProf  = input.bool(false, "Use Take Profit")
+takeProfPerc = input.float(2.0, "Take Profit %", step=0.1, minval=0.1)
+
+// Pull 5m (or chosen) closes without lookahead to avoid repainting
+sigClose = request.security(syminfo.tickerid, signalTf, close, lookahead=barmerge.lookahead_off, gaps=barmerge.gaps_off)
+ema200   = ta.ema(sigClose, emaLength)
+
+// Signals: breakout above / below EMA on bar close of signal timeframe
+longSignal  = ta.crossover(sigClose, ema200)
+shortSignal = ta.crossunder(sigClose, ema200)
+
+// Risk management sizing helpers
+slPriceLong  = useStopLoss  ? strategy.position_avg_price * (1 - stopLossPerc / 100) : na
+slPriceShort = useStopLoss  ? strategy.position_avg_price * (1 + stopLossPerc / 100) : na
+tpPriceLong  = useTakeProf  ? strategy.position_avg_price * (1 + takeProfPerc / 100) : na
+tpPriceShort = useTakeProf  ? strategy.position_avg_price * (1 - takeProfPerc / 100) : na
+
+// Entries on confirmed 5m bar closes
+if longSignal
+    strategy.entry("Long 200EMA", strategy.long, comment="5m 200EMA Breakout")
+if allowShorts and shortSignal
+    strategy.entry("Short 200EMA", strategy.short, comment="5m 200EMA Breakdown")
+
+// Exits: optional stop loss / take profit per side
+if useStopLoss or useTakeProf
+    strategy.exit("Long 200EMA Exit", from_entry="Long 200EMA", stop=slPriceLong, limit=tpPriceLong, comment="Risk mgmt")
+    if allowShorts
+        strategy.exit("Short 200EMA Exit", from_entry="Short 200EMA", stop=slPriceShort, limit=tpPriceShort, comment="Risk mgmt")
+
+// Plotting
+plot(sigClose, title="Signal Close (" + signalTf + ")", color=color.new(color.gray, 0))
+plot(ema200, title="EMA " + str.tostring(emaLength) + " (" + signalTf + ")", color=color.orange, linewidth=2)
+plotshape(longSignal, title="Long Signal", location=location.belowbar, color=color.new(color.green, 0), style=shape.triangleup, size=size.small, text="▲200EMA")
+plotshape(shortSignal and allowShorts, title="Short Signal", location=location.abovebar, color=color.new(color.red, 0), style=shape.triangledown, size=size.small, text="▼200EMA")
