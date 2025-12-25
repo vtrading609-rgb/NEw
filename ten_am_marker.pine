@@ -1,0 +1,20 @@
+//@version=6
+indicator("10AM Marker", overlay=true)
+
+// Inputs
+lineColor     = input.color(color.new(color.teal, 0), "Line Color")
+lineStyleOpt  = input.string("Dashed", "Line Style", options = ["Solid", "Dashed", "Dotted"])
+lineStyle     = lineStyleOpt == "Solid" ? line.style_solid : lineStyleOpt == "Dotted" ? line.style_dotted : line.style_dashed
+lineWidth     = input.int(1, "Line Width", minval = 1)
+showLabel     = input.bool(true, "Show 10AM Label")
+tzChoice      = input.string("Exchange", "Time Zone", options = ["Exchange", "Etc/UTC", "America/New_York", "Europe/London", "Asia/Tokyo"])
+tz            = tzChoice == "Exchange" ? syminfo.timezone : tzChoice
+
+// Detect 10:00 AM on the chart’s timeframe in the chosen timezone
+timeInTz = time(timeframe.period, tz)
+isTenAM  = hour(timeInTz) == 10 and minute(timeInTz) == 0
+
+if isTenAM
+    line.new(bar_index, low, bar_index, high, extend = extend.none, color = lineColor, style = lineStyle, width = lineWidth)
+    if showLabel
+        label.new(bar_index, high, text = "10:00", style = label.style_label_down, color = lineColor, textcolor = color.white)
